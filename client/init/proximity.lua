@@ -1,7 +1,7 @@
 -- used when muted
 local disableUpdates = false
 local isListenerEnabled = false
-local plyCoords = GetEntityCoords(PlayerPedId())
+local plyCoords = GetEntityCoords(cache.ped)
 proximity = MumbleGetTalkerProximity()
 currentTargets = {}
 
@@ -25,21 +25,18 @@ end)
 function addNearbyPlayers()
 	if disableUpdates then return end
 	-- update here so we don't have to update every call of addProximityCheck
-	plyCoords = GetEntityCoords(PlayerPedId())
+	plyCoords = GetEntityCoords(cache.ped)
 	proximity = MumbleGetTalkerProximity()
 	currentTargets = {}
 	MumbleClearVoiceTargetChannels(voiceTarget)
 	if LocalPlayer.state.disableProximity then return end
 	MumbleAddVoiceChannelListen(LocalPlayer.state.assignedChannel)
 	MumbleAddVoiceTargetChannel(voiceTarget, LocalPlayer.state.assignedChannel)
-
 	for source, _ in pairs(callData) do
 		if source ~= playerServerId then
 			MumbleAddVoiceTargetChannel(voiceTarget, MumbleGetVoiceChannelFromServerId(source))
 		end
 	end
-
-
 	local players = GetActivePlayers()
 	for i = 1, #players do
 		local ply = players[i]
@@ -119,7 +116,7 @@ CreateThread(function()
 		end
 		-- Leave the check here as we don't want to do any of this logic
 		if GetConvarInt('voice_enableUi', 1) == 1 then
-			local curTalkingStatus = MumbleIsPlayerTalking(PlayerId()) == 1
+			local curTalkingStatus = MumbleIsPlayerTalking(cache.playerId) == 1
 			if lastRadioStatus ~= radioPressed or lastTalkingStatus ~= curTalkingStatus then
 				lastRadioStatus = radioPressed
 				lastTalkingStatus = curTalkingStatus
@@ -129,7 +126,6 @@ CreateThread(function()
 				})
 			end
 		end
-
 		if voiceState == "proximity" then
 			addNearbyPlayers()
 			-- What a name, wowza
@@ -141,7 +137,6 @@ CreateThread(function()
 				setSpectatorMode(false)
 			end
 		end
-
 		Wait(GetConvarInt('voice_refreshRate', 200))
 	end
 end)
@@ -165,7 +160,6 @@ exports("setVoiceState", function(_voiceState, channel)
 	end
 end)
 
-
 AddEventHandler("onClientResourceStop", function(resource)
 	if type(addProximityCheck) == "table" then
 		local proximityCheckRef = addProximityCheck.__cfx_functionReference
@@ -173,9 +167,7 @@ AddEventHandler("onClientResourceStop", function(resource)
 			local isResource = string.match(proximityCheckRef, resource)
 			if isResource then
 				addProximityCheck = orig_addProximityCheck
-				logger.warn(
-					'Reset proximity check to default, the original resource [%s] which provided the function restarted',
-					resource)
+				logger.warn('Reset proximity check to default, the original resource [%s] which provided the function restarted', resource)
 			end
 		end
 	end
@@ -207,6 +199,5 @@ exports("removeVoiceMode", function(name)
 			return true
 		end
 	end
-
 	return false
 end)

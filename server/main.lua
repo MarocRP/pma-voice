@@ -9,7 +9,6 @@ function firstFreeChannel()
 			return i
 		end
 	end
-
 	return 0
 end
 
@@ -36,7 +35,6 @@ function handleStateBagInitilization(source)
 		-- We want to save voice inits because we'll automatically reinitalize calls and channels
 		plyState:set('pmaVoiceInit', true, false)
 	end
-
 	local assignedChannel = firstFreeChannel()
 	plyState:set('assignedChannel', assignedChannel, true)
 	if assignedChannel ~= 0 then
@@ -53,21 +51,14 @@ CreateThread(function()
 		local ply = tonumber(plyTbl[i])
 		voiceData[ply] = defaultTable(plyTbl[i])
 	end
-
 	Wait(5000)
-
 	local nativeAudio = GetConvar('voice_useNativeAudio', 'not-set')
 	local _3dAudio = GetConvar('voice_use3dAudio', 'not-set')
 	local _2dAudio = GetConvar('voice_use2dAudio', 'not-set')
 	local sendingRangeOnly = GetConvar('voice_useSendingRangeOnly', 'not-set')
 	local gameVersion = GetConvar('gamename', 'fivem')
-
 	-- handle no convars being set (default drag n' drop)
-	if
-		nativeAudio == 'not-set'
-		and _3dAudio == 'not-set'
-		and _2dAudio == 'not-set'
-	then
+	if nativeAudio == 'not-set' and _3dAudio == 'not-set' and _2dAudio == 'not-set' then
 		SetConvarReplicated('voice_useNativeAudio', 'true')
 		if sendingRangeOnly == 'not-set' then
 			SetConvarReplicated('voice_useSendingRangeOnly', 'true')
@@ -80,21 +71,15 @@ CreateThread(function()
 		logger.warn(
 			"It's recommended to have 'voice_useSendingRangeOnly' set to true, you can do that with 'setr voice_useSendingRangeOnly true', this prevents players who directly join the mumble server from broadcasting to players.")
 	end
-
 	local radioVolume = GetConvarInt("voice_defaultRadioVolume", 30)
 	local callVolume = GetConvarInt("voice_defaultCallVolume", 60)
-
 	-- When casted to an integer these get set to 0 or 1, so warn on these values that they don't work
-	if
-		radioVolume == 0 or radioVolume == 1 or
-		callVolume == 0 or callVolume == 1
-	then
+	if radioVolume == 0 or radioVolume == 1 or callVolume == 0 or callVolume == 1 then
 		SetConvarReplicated("voice_defaultRadioVolume", 30)
 		SetConvarReplicated("voice_defaultCallVolume", 60)
 		for i = 1, 5 do
 			Wait(5000)
-			logger.warn(
-				"`voice_defaultRadioVolume` or `voice_defaultCallVolume` have their value set as a float, this is going to automatically be fixed but please update your convars.")
+			logger.warn("`voice_defaultRadioVolume` or `voice_defaultCallVolume` have their value set as a float, this is going to automatically be fixed but please update your convars.")
 		end
 	end
 end)
@@ -108,21 +93,16 @@ end)
 AddEventHandler("playerDropped", function()
 	local source = source
 	local mappedChannel = Player(source).state.assignedChannel
-
 	if voiceData[source] then
 		local plyData = voiceData[source]
-
 		if plyData.radio ~= 0 then
 			removePlayerFromRadio(source, plyData.radio)
 		end
-
 		if plyData.call ~= 0 then
 			removePlayerFromCall(source, plyData.call)
 		end
-
 		voiceData[source] = nil
 	end
-
 	if mappedChannel then
 		mappedChannels[mappedChannel] = nil
 		logger.verbose('[reuse] Unassigned %s from channel %s', source, mappedChannel)

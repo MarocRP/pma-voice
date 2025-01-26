@@ -59,7 +59,6 @@ function addPlayerToRadio(source, radioChannel)
 		return false
 	end
 	logger.verbose('[radio] Added %s to radio %s', source, radioChannel)
-
 	-- check if the channel exists, if it does set the varaible to it
 	-- if not create it (basically if not radiodata make radiodata)
 	radioData[radioChannel] = radioData[radioChannel] or {}
@@ -163,7 +162,6 @@ AddEventHandler("onResourceStop", function(resource)
 				channel)
 		end
 	end
-
 	if type(radioNameGetter) == "table" then
 		local radioRef = radioNameGetter.__cfx_functionReference
 		if radioRef then

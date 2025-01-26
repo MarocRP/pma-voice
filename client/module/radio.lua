@@ -1,6 +1,11 @@
 local radioChannel = 0
 local radioNames = {}
 local disableRadioAnim = false
+local radioProp = nil
+local jobs = {
+	['police'] = true,
+	['civilprotection'] = true
+}
 
 ---@return boolean isEnabled if radioEnabled is true and LocalPlayer.state.disableRadio is 0 (no bits set)
 function isRadioEnabled()
@@ -19,13 +24,10 @@ function syncRadioData(radioTable, localPlyRadioName)
 		tPrint(radioData)
 		print('-----------------------------')
 	end
-
 	local isEnabled = isRadioEnabled()
-
 	if isEnabled then
 		handleRadioAndCallInit()
 	end
-
 	sendUIMessage({
 		radioChannel = radioChannel,
 		radioEnabled = isEnabled
@@ -162,20 +164,24 @@ end)
 --- it to their need as this will likely never be changed
 --- but you can integrate the below state bag to your death resources.
 --- LocalPlayer.state:set('isDead', true or false, false)
-function isDead()
+--[[function isDead()
 	if LocalPlayer.state.isDead then
 		return true
-	elseif IsPlayerDead(PlayerId()) then
+	elseif IsPlayerDead(cache.playerId) then
 		return true
 	end
 	return false
 end
 
+function isCuffedZiptied()
+	return LocalPlayer.state.isCuffed or LocalPlayer.state.isZiptied
+end--]]
+
 function isRadioAnimEnabled()
 	if
 		GetConvarInt('voice_enableRadioAnim', 1) == 1
 		and not (GetConvarInt('voice_disableVehicleRadioAnim', 0) == 1
-			and IsPedInAnyVehicle(PlayerPedId(), false))
+			and IsPedInAnyVehicle(cache.ped, false))
 		and not disableRadioAnim then
 		return true
 	end
@@ -184,10 +190,14 @@ end
 
 RegisterCommand('+radiotalk', function()
 	if GetConvarInt('voice_enableRadios', 1) ~= 1 then return end
-	if isDead() then return end
+	--if isDead() or isCuffedZiptied() then return end
 	if not isRadioEnabled() then return end
 	if not radioPressed then
 		if radioChannel > 0 then
+			local isGovJob = jobs[QBX.PlayerData.job.name]
+			local dict = isGovJob and 'random@arrests' or 'ultra@walkie_talkie'
+			local anim = isGovJob and 'generic_radio_enter' or 'walkie_talkie'
+			radioProp = not isGovJob and CreateObject(`walkietalkie_black`, 1.0, 1.0, 1.0, 1, 1, 0) or nil
 			logger.info('[radio] Start broadcasting, update targets and notify server.')
 			addVoiceTargets(radioData, callData)
 			TriggerServerEvent('pma-voice:setTalkingOnRadio', true)
@@ -195,22 +205,25 @@ RegisterCommand('+radiotalk', function()
 			local shouldPlayAnimation = isRadioAnimEnabled()
 			playMicClicks(true)
 			if shouldPlayAnimation then
-				RequestAnimDict('random@arrests')
+				RequestAnimDict(dict)
 			end
 			CreateThread(function()
 				TriggerEvent("pma-voice:radioActive", true)
 				LocalPlayer.state:set("radioActive", true, true);
 				local checkFailed = false
 				while radioPressed do
-					if radioChannel < 0 or isDead() or not isRadioEnabled() then
+					if radioChannel < 0 --[[or isDead() or isCuffedZiptied()--]] or not isRadioEnabled() then
 						checkFailed = true
 						break
 					end
-					if shouldPlayAnimation and HasAnimDictLoaded("random@arrests") then
-						if not IsEntityPlayingAnim(PlayerPedId(), "random@arrests", "generic_radio_enter", 3) then
-							TaskPlayAnim(PlayerPedId(), "random@arrests", "generic_radio_enter", 8.0, 2.0, -1, 50, 2.0, false,
+					if shouldPlayAnimation and HasAnimDictLoaded(dict) then
+						if not IsEntityPlayingAnim(cache.ped, dict, anim, 3) then
+							TaskPlayAnim(cache.ped, dict, anim, 8.0, 2.0, -1, 50, 2.0, false,
 								false,
 							false)
+							if DoesEntityExist(radioProp) then
+								AttachEntityToEntity(radioProp, cache.ped, GetPedBoneIndex(cache.ped, 18905), 0.130000, 0.050000, 0.000000, -111.300751, 0.000000, -44.100067, true, true, false, true, 1, true)
+							end
 						end
 					end
 					SetControlNormal(0, 249, 1.0)
@@ -218,14 +231,12 @@ RegisterCommand('+radiotalk', function()
 					SetControlNormal(2, 249, 1.0)
 					Wait(0)
 				end
-
-
 				if checkFailed then
 					logger.info("Canceling radio talking as the checks have failed.")
 					ExecuteCommand("-radiotalk")
 				end
 				if shouldPlayAnimation then
-					RemoveAnimDict('random@arrests')
+					RemoveAnimDict(dict)
 				end
 			end)
 		else
@@ -236,6 +247,9 @@ end, false)
 
 RegisterCommand('-radiotalk', function()
 	if radioChannel > 0 and radioPressed then
+		local isGovJob = jobs[QBX.PlayerData.job.name]
+		local dict = isGovJob and 'random@arrests' or 'ultra@walkie_talkie'
+		local anim = isGovJob and 'generic_radio_enter' or 'walkie_talkie'
 		radioPressed = false
 		MumbleClearVoiceTargetPlayers(voiceTarget)
 		addVoiceTargets(callData)
@@ -243,7 +257,12 @@ RegisterCommand('-radiotalk', function()
 		LocalPlayer.state:set("radioActive", false, true);
 		playMicClicks(false)
 		if GetConvarInt('voice_enableRadioAnim', 1) == 1 then
-			StopAnimTask(PlayerPedId(), "random@arrests", "generic_radio_enter", -4.0)
+			StopAnimTask(cache.ped, dict, anim, -4.0)
+		end
+		if DoesEntityExist(radioProp) then
+			DeleteEntity(radioProp)
+			DeleteObject(radioProp)
+			radioProp = nil
 		end
 		TriggerServerEvent('pma-voice:setTalkingOnRadio', false)
 	end

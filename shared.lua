@@ -7,40 +7,32 @@ gameVersion = GetGameName()
 -- these are just here to satisfy linting
 if not IsDuplicityVersion() then
 	LocalPlayer = LocalPlayer
-	playerServerId = GetPlayerServerId(PlayerId())
-
+	playerServerId = GetPlayerServerId(cache.playerId)
 	if gameVersion == "redm" then
 		function CreateAudioSubmix(name)
 			return Citizen.InvokeNative(0x658d2bc8, name, Citizen.ResultAsInteger())
 		end
-
 		function AddAudioSubmixOutput(submixId, outputSubmixId)
 			Citizen.InvokeNative(0xAC6E290D, submixId, outputSubmixId)
 		end
-
 		function MumbleSetSubmixForServerId(serverId, submixId)
 			Citizen.InvokeNative(0xFE3A3054, serverId, submixId)
 		end
-
 		function SetAudioSubmixEffectParamFloat(submixId, effectSlot, paramIndex, paramValue)
 			Citizen.InvokeNative(0x9A209B3C, submixId, effectSlot, paramIndex, paramValue)
 		end
-
 		function SetAudioSubmixEffectParamInt(submixId, effectSlot, paramIndex, paramValue)
 			Citizen.InvokeNative(0x77FAE2B8, submixId, effectSlot, paramIndex, paramValue)
 		end
-
 		function SetAudioSubmixEffectRadioFx(submixId, effectSlot)
 			Citizen.InvokeNative(0xAAA94D53, submixId, effectSlot)
 		end
-
-		function SetAudioSubmixOutputVolumes(submixId, outputSlot, frontLeftVolume, frontRightVolume, rearLeftVolume,
-											 rearRightVolume, channel5Volume, channel6Volume)
-			Citizen.InvokeNative(0x825DC0D1, submixId, outputSlot, frontLeftVolume, frontRightVolume, rearLeftVolume,
-				rearRightVolume, channel5Volume, channel6Volume)
+		function SetAudioSubmixOutputVolumes(submixId, outputSlot, frontLeftVolume, frontRightVolume, rearLeftVolume, rearRightVolume, channel5Volume, channel6Volume)
+			Citizen.InvokeNative(0x825DC0D1, submixId, outputSlot, frontLeftVolume, frontRightVolume, rearLeftVolume, rearRightVolume, channel5Volume, channel6Volume)
 		end
 	end
 end
+
 Player = Player
 Entity = Entity
 
@@ -80,7 +72,6 @@ logger = {
 		end
 	end,
 }
-
 
 function tPrint(tbl, indent)
 	indent = indent or 0

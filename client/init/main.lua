@@ -20,7 +20,6 @@ submixIndicies = {}
 function setVolume(volume, volumeType)
 	type_check({ volume, "number" })
 	local volumeFraction = volume / 100
-
 	if volumeType then
 		local volumeTbl = volumes[volumeType]
 		if volumeTbl then
@@ -42,16 +41,18 @@ end
 exports('setRadioVolume', function(vol)
 	setVolume(vol, 'radio')
 end)
+
 exports('getRadioVolume', function()
 	return volumes['radio'] * 100
 end)
+
 exports("setCallVolume", function(vol)
 	setVolume(vol, 'call')
 end)
+
 exports('getCallVolume', function()
 	return volumes['call'] * 100
 end)
-
 
 -- default submix incase people want to fiddle with it.
 -- freq_low = 389.0
@@ -195,7 +196,6 @@ function addVoiceTargets(...)
 	local addedPlayers = {
 		[playerServerId] = true
 	}
-
 	for i = 1, #targets do
 		for id, _ in pairs(targets[i]) do
 			-- we don't want to log ourself, or listen to ourself
@@ -288,7 +288,6 @@ CreateThread(function()
 	end
 end)
 
-
 if gameVersion == 'redm' then
 	CreateThread(function()
 		while true do
@@ -315,7 +314,6 @@ function handleRadioAndCallInit()
 			toggleVoice(tgt, enabled, 'radio')
 		end
 	end
-
 	for tgt, enabled in pairs(callData) do
 		if tgt ~= playerServerId then
 			toggleVoice(tgt, true, 'call')

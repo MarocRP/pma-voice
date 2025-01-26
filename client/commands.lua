@@ -10,7 +10,8 @@ RegisterCommand('setvoiceintent', function(source, args)
 		end
 		LocalPlayer.state:set('voiceIntent', intent, true)
 	end
-end)
+end, false)
+
 TriggerEvent('chat:addSuggestion', '/setvoiceintent', 'Sets the players voice intent', {
 	{
 		name = "intent",
@@ -22,7 +23,8 @@ TriggerEvent('chat:addSuggestion', '/setvoiceintent', 'Sets the players voice in
 RegisterCommand('vol', function(_, args)
 	if not args[1] then return end
 	setVolume(tonumber(args[1]))
-end)
+end, false)
+
 TriggerEvent('chat:addSuggestion', '/vol', 'Sets the radio/phone volume', {
 	{ name = "volume", help = "A range between 1-100 on how loud you want them to be" },
 })
@@ -67,17 +69,16 @@ RegisterCommand('cycleproximity', function()
 	-- Proximity is either disabled, or manually overwritten.
 	if GetConvarInt('voice_enableProximityCycle', 1) ~= 1 or disableProximityCycle then return end
 	local newMode = mode + 1
-
 	-- If we're within the range of our voice modes, allow the increase, otherwise reset to the first state
 	if newMode <= #Cfg.voiceModes then
 		mode = newMode
 	else
 		mode = 1
 	end
-
 	setProximityState(Cfg.voiceModes[mode][1], false)
 	TriggerEvent('pma-voice:setTalkingMode', mode)
 end, false)
+
 if gameVersion == 'fivem' then
 	RegisterKeyMapping('cycleproximity', 'Cycle Proximity', 'keyboard', GetConvar('voice_defaultCycle', 'F11'))
 end

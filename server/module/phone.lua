@@ -56,9 +56,7 @@ function setPlayerCall(source, _callChannel)
 		-- changed
 		TriggerClientEvent('pma-voice:clSetPlayerCall', source, callChannel)
 	end
-
 	Player(source).state.callChannel = callChannel
-
 	if callChannel ~= 0 and plyVoice.call == 0 then
 		addPlayerToCall(source, callChannel)
 	elseif callChannel == 0 then
