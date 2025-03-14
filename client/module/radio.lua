@@ -1,6 +1,10 @@
 local radioChannel = 0
 local radioNames = {}
 local disableRadioAnim = false
+local radioAnim = {
+	dict = "random@arrests",
+	anim = "generic_radio_enter",
+}
 local radioProp = nil
 local jobs = {
 	['police'] = true,
@@ -204,6 +208,10 @@ RegisterCommand('+radiotalk', function()
 			radioPressed = true
 			local shouldPlayAnimation = isRadioAnimEnabled()
 			playMicClicks(true)
+			-- localize here so in the off case someone changes this while its in use we
+			-- still remove our dictionary down below here
+			local dict = radioAnim.dict
+			local anim = radioAnim.anim
 			if shouldPlayAnimation then
 				RequestAnimDict(dict)
 			end
@@ -270,6 +278,17 @@ end, false)
 if gameVersion == 'fivem' then
 	RegisterKeyMapping('+radiotalk', 'Talk over Radio', 'keyboard', GetConvar('voice_defaultRadio', 'LMENU'))
 end
+
+local function setRadioTalkAnim(dict, anim)
+    type_check({dict, "string"}, {anim, "string"})
+    if not DoesAnimDictExist(dict) then
+      return error(("Dict: %s did not exist"):format(dict))
+    end
+    radioAnim.dict = dict
+    radioAnim.anim = anim
+end
+
+exports('setRadioTalkAnim', setRadioTalkAnim)
 
 --- event syncRadio
 --- syncs the players radio, only happens if the radio was set server side.

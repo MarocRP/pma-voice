@@ -1,3 +1,5 @@
+isInitialized = false
+
 function handleInitialState()
 	local voiceModeData = Cfg.voiceModes[mode]
 	MumbleSetTalkerProximity(voiceModeData[1] + 0.0)
@@ -5,9 +7,12 @@ function handleInitialState()
 	MumbleSetVoiceTarget(voiceTarget)
 	MumbleSetVoiceChannel(LocalPlayer.state.assignedChannel)
 	while MumbleGetVoiceChannelFromServerId(playerServerId) ~= LocalPlayer.state.assignedChannel do
-		Wait(250)
+		Wait(100)
 		MumbleSetVoiceChannel(LocalPlayer.state.assignedChannel)
 	end
+
+	isInitialized = true
+
 	MumbleAddVoiceTargetChannel(voiceTarget, LocalPlayer.state.assignedChannel)
 	addNearbyPlayers()
 end
@@ -27,7 +32,9 @@ AddEventHandler('mumbleConnected', function(address, isReconnecting)
 end)
 
 AddEventHandler('mumbleDisconnected', function(address)
-	logger.info('Disconnected from mumble server with address of %s', GetConvarInt('voice_hideEndpoints', 1) == 1 and 'HIDDEN' or address)
+	isInitialized = false
+	logger.info('Disconnected from mumble server with address of %s',
+		GetConvarInt('voice_hideEndpoints', 1) == 1 and 'HIDDEN' or address)
 end)
 
 -- TODO: Convert the last Cfg to a Convar, while still keeping it simple.
