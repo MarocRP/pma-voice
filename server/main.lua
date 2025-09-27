@@ -49,7 +49,7 @@ CreateThread(function()
 	local plyTbl = GetPlayers()
 	for i = 1, #plyTbl do
 		local ply = tonumber(plyTbl[i])
-		voiceData[ply] = defaultTable(plyTbl[i])
+		voiceData[ply] = defaultTable(ply)
 	end
 	Wait(5000)
 	local nativeAudio = GetConvar('voice_useNativeAudio', 'not-set')
