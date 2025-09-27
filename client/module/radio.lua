@@ -6,10 +6,35 @@ local radioAnim = {
 	anim = "generic_radio_enter",
 }
 local radioProp = nil
+local govRadioProp = nil
 local jobs = {
 	['police'] = true,
-	['civilprotection'] = true
+	['firefighter'] = true
 }
+
+local function deleteEntity(entity)
+    if not DoesEntityExist(entity) then return end
+    NetworkRequestControlOfEntity(entity)
+    local controlTimeout = 2000
+    while controlTimeout > 0 and not NetworkHasControlOfEntity(entity) do
+        Wait(100)
+        controlTimeout = controlTimeout - 100
+    end
+    SetEntityAsMissionEntity(entity, true, true)
+    local missionTimeout = 2000
+    while missionTimeout > 0 and not IsEntityAMissionEntity(entity) do
+        Wait(100)
+        missionTimeout = missionTimeout - 100
+    end
+    if DoesEntityExist(entity) then
+        DeleteEntity(entity)
+        Wait(0)
+        if DoesEntityExist(entity) then
+            -- fallback to native force-delete
+            Citizen.InvokeNative(0xEA386986E786A54F, entity)
+        end
+    end
+end
 
 ---@return boolean isEnabled if radioEnabled is true and LocalPlayer.state.disableRadio is 0 (no bits set)
 function isRadioEnabled()
@@ -181,9 +206,8 @@ function isCuffedZiptied()
 	return LocalPlayer.state.isCuffed or LocalPlayer.state.isZiptied
 end--]]
 
-function isRadioAnimEnabled()
-	if
-		GetConvarInt('voice_enableRadioAnim', 1) == 1
+local function isRadioAnimEnabled()
+	if GetConvarInt('voice_enableRadioAnim', 1) == 1
 		and not (GetConvarInt('voice_disableVehicleRadioAnim', 0) == 1
 			and IsPedInAnyVehicle(cache.ped, false))
 		and not disableRadioAnim then
@@ -194,44 +218,41 @@ end
 
 RegisterCommand('+radiotalk', function()
 	if GetConvarInt('voice_enableRadios', 1) ~= 1 then return end
-	--if isDead() or isCuffedZiptied() then return end
 	if not isRadioEnabled() then return end
 	if not radioPressed then
 		if radioChannel > 0 then
 			local isGovJob = jobs[QBX.PlayerData.job.name]
-			local dict = isGovJob and 'random@arrests' or 'ultra@walkie_talkie'
-			local anim = isGovJob and 'generic_radio_enter' or 'walkie_talkie'
-			radioProp = not isGovJob and CreateObject(`walkietalkie_black`, 1.0, 1.0, 1.0, 1, 1, 0) or nil
+			local dict = 'ultra@walkie_talkie'
+			local anim = 'walkie_talkie'
 			logger.info('[radio] Start broadcasting, update targets and notify server.')
 			addVoiceTargets(radioData, callData)
 			TriggerServerEvent('pma-voice:setTalkingOnRadio', true)
 			radioPressed = true
 			local shouldPlayAnimation = isRadioAnimEnabled()
 			playMicClicks(true)
-			-- localize here so in the off case someone changes this while its in use we
-			-- still remove our dictionary down below here
-			local dict = radioAnim.dict
-			local anim = radioAnim.anim
-			if shouldPlayAnimation then
-				RequestAnimDict(dict)
-			end
 			CreateThread(function()
 				TriggerEvent("pma-voice:radioActive", true)
-				LocalPlayer.state:set("radioActive", true, true);
+				LocalPlayer.state:set("radioActive", true, true)
 				local checkFailed = false
+				local animPlayed = false -- NEW FLAG to prevent re-triggering
 				while radioPressed do
-					if radioChannel < 0 --[[or isDead() or isCuffedZiptied()--]] or not isRadioEnabled() then
+					if radioChannel < 0 or not isRadioEnabled() then
 						checkFailed = true
 						break
 					end
-					if shouldPlayAnimation and HasAnimDictLoaded(dict) then
-						if not IsEntityPlayingAnim(cache.ped, dict, anim, 3) then
-							TaskPlayAnim(cache.ped, dict, anim, 8.0, 2.0, -1, 50, 2.0, false,
-								false,
-							false)
-							if DoesEntityExist(radioProp) then
-								AttachEntityToEntity(radioProp, cache.ped, GetPedBoneIndex(cache.ped, 18905), 0.130000, 0.050000, 0.000000, -111.300751, 0.000000, -44.100067, true, true, false, true, 1, true)
-							end
+					if shouldPlayAnimation and not animPlayed then
+						lib.playAnim(cache.ped, dict, anim, 8.0, 2.0, -1, 49, 2.0, false, false, false)
+						animPlayed = true
+						if not DoesEntityExist(radioProp) and not isGovJob then
+							radioProp = CreateObject(`walkietalkie_black`, 1.0, 1.0, 1.0, 1, 1, 0)
+							AttachEntityToEntity(radioProp, cache.ped, GetPedBoneIndex(cache.ped, 18905),
+								0.130000, 0.050000, 0.000000, -111.300751, 0.000000, -44.100067,
+								true, true, false, true, 1, true)
+						elseif not DoesEntityExist(govRadioProp) and isGovJob then
+							govRadioProp = CreateObject(`prop_cs_hand_radio`, 1.0, 1.0, 1.0, 1, 1, 0)
+							AttachEntityToEntity(govRadioProp, cache.ped, GetPedBoneIndex(cache.ped, 18905),
+								0.14, 0.03, 0.03, -105.877, -10.943200, -33.721200,
+								true, true, false, true, 1, true)
 						end
 					end
 					SetControlNormal(0, 249, 1.0)
@@ -245,6 +266,7 @@ RegisterCommand('+radiotalk', function()
 				end
 				if shouldPlayAnimation then
 					RemoveAnimDict(dict)
+					StopAnimTask(cache.ped, dict, anim, -4.0)
 				end
 			end)
 		else
@@ -255,9 +277,8 @@ end, false)
 
 RegisterCommand('-radiotalk', function()
 	if radioChannel > 0 and radioPressed then
-		local isGovJob = jobs[QBX.PlayerData.job.name]
-		local dict = isGovJob and 'random@arrests' or 'ultra@walkie_talkie'
-		local anim = isGovJob and 'generic_radio_enter' or 'walkie_talkie'
+		local dict = 'ultra@walkie_talkie'
+		local anim = 'walkie_talkie'
 		radioPressed = false
 		MumbleClearVoiceTargetPlayers(voiceTarget)
 		addVoiceTargets(callData)
@@ -268,15 +289,20 @@ RegisterCommand('-radiotalk', function()
 			StopAnimTask(cache.ped, dict, anim, -4.0)
 		end
 		if DoesEntityExist(radioProp) then
-			DeleteEntity(radioProp)
-			DeleteObject(radioProp)
+			deleteEntity(radioProp)
+			SetEntityAsNoLongerNeeded(radioProp)
 			radioProp = nil
+		end
+		if DoesEntityExist(govRadioProp) then
+			deleteEntity(govRadioProp)
+			SetEntityAsNoLongerNeeded(govRadioProp)
+			govRadioProp = nil
 		end
 		TriggerServerEvent('pma-voice:setTalkingOnRadio', false)
 	end
 end, false)
 if gameVersion == 'fivem' then
-	RegisterKeyMapping('+radiotalk', 'Talk over Radio', 'keyboard', GetConvar('voice_defaultRadio', 'LMENU'))
+	RegisterKeyMapping('+radiotalk', 'Talk Over Radio', 'keyboard', GetConvar('voice_defaultRadio', 'LMENU'))
 end
 
 local function setRadioTalkAnim(dict, anim)
