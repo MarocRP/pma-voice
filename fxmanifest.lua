@@ -1,4 +1,6 @@
 game 'common'
+version '7.0.1'
+
 fx_version 'cerulean'
 
 author 'AvarianKnight'
