@@ -2,9 +2,11 @@ local radioChannel = 0
 local radioNames = {}
 local disableRadioAnim = false
 local radioAnim = {
-	dict = "random@arrests",
-	anim = "generic_radio_enter",
+	dict = "ultra@walkie_talkie",
+	anim = "walkie_talkie",
 }
+local lastRadioAnimDict = radioAnim.dict
+local lastRadioAnimName = radioAnim.anim
 local radioProp = nil
 local govRadioProp = nil
 local jobs = {
@@ -13,31 +15,36 @@ local jobs = {
 }
 
 local function deleteEntity(entity)
-    if not DoesEntityExist(entity) then return end
-    NetworkRequestControlOfEntity(entity)
-    local controlTimeout = 2000
-    while controlTimeout > 0 and not NetworkHasControlOfEntity(entity) do
-        Wait(100)
-        controlTimeout = controlTimeout - 100
-    end
-    SetEntityAsMissionEntity(entity, true, true)
-    local missionTimeout = 2000
-    while missionTimeout > 0 and not IsEntityAMissionEntity(entity) do
-        Wait(100)
-        missionTimeout = missionTimeout - 100
-    end
-    if DoesEntityExist(entity) then
-        DeleteEntity(entity)
-        Wait(0)
-        if DoesEntityExist(entity) then
-            -- fallback to native force-delete
-            Citizen.InvokeNative(0xEA386986E786A54F, entity)
-        end
-    end
+	if not DoesEntityExist(entity) then return end
+	-- Fast path when we already own the entity
+	if not NetworkGetEntityIsNetworked(entity) or NetworkHasControlOfEntity(entity) then
+		SetEntityAsMissionEntity(entity, true, true)
+		DeleteEntity(entity)
+		if DoesEntityExist(entity) then
+			Citizen.InvokeNative(0xEA386986E786A54F, entity)
+		end
+		return
+	end
+	-- Try to gain control quickly (max ~1s)
+	NetworkRequestControlOfEntity(entity)
+	local controlTimeout = 1000
+	while controlTimeout > 0 and not NetworkHasControlOfEntity(entity) do
+		Wait(50)
+		controlTimeout -= 50
+	end
+	if not NetworkHasControlOfEntity(entity) then
+		logger.warn("[radio] Could not gain control to delete entity %s", entity)
+		return
+	end
+	SetEntityAsMissionEntity(entity, true, true)
+	DeleteEntity(entity)
+	if DoesEntityExist(entity) then
+		Citizen.InvokeNative(0xEA386986E786A54F, entity)
+	end
 end
 
 ---@return boolean isEnabled if radioEnabled is true and LocalPlayer.state.disableRadio is 0 (no bits set)
-function isRadioEnabled()
+function IsRadioEnabled()
 	return radioEnabled and LocalPlayer.state.disableRadio == 0
 end
 
@@ -53,7 +60,7 @@ function syncRadioData(radioTable, localPlyRadioName)
 		tPrint(radioData)
 		print('-----------------------------')
 	end
-	local isEnabled = isRadioEnabled()
+	local isEnabled = IsRadioEnabled()
 	if isEnabled then
 		handleRadioAndCallInit()
 	end
@@ -75,7 +82,7 @@ RegisterNetEvent('pma-voice:syncRadioData', syncRadioData)
 function setTalkingOnRadio(plySource, enabled)
 	radioData[plySource] = enabled
 
-	if not isRadioEnabled() then return logger.info("[radio] Ignoring setTalkingOnRadio. radioEnabled: %s disableRadio: %s", radioEnabled, LocalPlayer.state.disableRadio) end
+	if not IsRadioEnabled() then return logger.info("[radio] Ignoring setTalkingOnRadio. radioEnabled: %s disableRadio: %s", radioEnabled, LocalPlayer.state.disableRadio) end
 	-- If we're on a call we don't want to toggle their voice disabled this will break calls.
 	local enabled = enabled or callData[plySource]
 	toggleVoice(plySource, enabled, 'radio')
@@ -105,6 +112,7 @@ RegisterNetEvent('pma-voice:addPlayerToRadio', addPlayerToRadio)
 function removePlayerFromRadio(plySource)
 	if plySource == playerServerId then
 		logger.info('[radio] Left radio %s, cleaning up.', radioChannel)
+		radioChannel = 0
 		for tgt, _ in pairs(radioData) do
 			if tgt ~= playerServerId then
 				toggleVoice(tgt, false, 'radio')
@@ -218,12 +226,15 @@ end
 
 RegisterCommand('+radiotalk', function()
 	if GetConvarInt('voice_enableRadios', 1) ~= 1 then return end
-	if not isRadioEnabled() then return end
+	if not IsRadioEnabled() then return end
 	if not radioPressed then
 		if radioChannel > 0 then
-			local isGovJob = jobs[QBX.PlayerData.job.name]
-			local dict = 'ultra@walkie_talkie'
-			local anim = 'walkie_talkie'
+			local jobName = QBX.PlayerData.job.name
+			local isGovJob = jobName and jobs[jobName] or false
+			local dict = radioAnim.dict
+			local anim = radioAnim.anim
+			lastRadioAnimDict = dict
+			lastRadioAnimName = anim
 			logger.info('[radio] Start broadcasting, update targets and notify server.')
 			addVoiceTargets(radioData, callData)
 			TriggerServerEvent('pma-voice:setTalkingOnRadio', true)
@@ -236,7 +247,7 @@ RegisterCommand('+radiotalk', function()
 				local checkFailed = false
 				local animPlayed = false -- NEW FLAG to prevent re-triggering
 				while radioPressed do
-					if radioChannel < 0 or not isRadioEnabled() then
+					if radioChannel < 0 or not IsRadioEnabled() then
 						checkFailed = true
 						break
 					end
@@ -277,8 +288,8 @@ end, false)
 
 RegisterCommand('-radiotalk', function()
 	if radioChannel > 0 and radioPressed then
-		local dict = 'ultra@walkie_talkie'
-		local anim = 'walkie_talkie'
+		local dict = lastRadioAnimDict
+		local anim = lastRadioAnimName
 		radioPressed = false
 		MumbleClearVoiceTargetPlayers(voiceTarget)
 		addVoiceTargets(callData)
@@ -321,7 +332,7 @@ exports('setRadioTalkAnim', setRadioTalkAnim)
 ---@param _radioChannel number the radio channel to set the player to.
 function syncRadio(_radioChannel)
 	if GetConvarInt('voice_enableRadios', 1) ~= 1 then return end
-	logger.info('[radio] radio set serverside update to radio %s', radioChannel)
+	logger.info('[radio] radio set serverside update to radio %s', _radioChannel)
 	radioChannel = _radioChannel
 end
 RegisterNetEvent('pma-voice:clSetPlayerRadio', syncRadio)
@@ -354,4 +365,3 @@ local function removeRadioDisableBit(bit)
 	LocalPlayer.state:set("disableRadio", curVal, true)
 end
 exports("removeRadioDisableBit", removeRadioDisableBit)
-
